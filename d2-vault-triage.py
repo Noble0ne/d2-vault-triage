@@ -24,6 +24,8 @@ at what's already covering the niche and what the actual best option is.
 A niche already covered by an owned exotic skips this entirely.
 
 Reuse for anyone else: point it at their DIM CSV export, keep the same xlsx.
+
+Designed by github.com/Noble0ne, with Claude.
 """
 import sys, csv, re, zipfile, os
 from xml.etree import ElementTree as ET

@@ -74,3 +74,7 @@ The script is generic — point it at your own DIM CSV export and keep whatever 
 ## License
 
 MIT
+
+---
+
+Designed by [github.com/Noble0ne](https://github.com/Noble0ne), with Claude.
