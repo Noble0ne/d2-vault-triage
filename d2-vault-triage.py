@@ -7,6 +7,10 @@ vs UNLOCK (safe to dismantle).
 Usage:
     python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
 
+Or run it with no arguments and it will ask for each path interactively --
+drag a file from Finder/Explorer straight into the terminal window to fill
+in its path instead of typing it out.
+
 Threshold: S/A tier -> LOCK. B/C/D/E/F tier -> UNLOCK. Untiered/not in the
 sheet -> UNLOCK (holds no value in the current sandbox). Exotics are exempt
 from all of the above -- every owned exotic locks, regardless of grade.
@@ -21,7 +25,7 @@ A niche already covered by an owned exotic skips this entirely.
 
 Reuse for anyone else: point it at their DIM CSV export, keep the same xlsx.
 """
-import sys, csv, re, zipfile
+import sys, csv, re, zipfile, os
 from xml.etree import ElementTree as ET
 
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
@@ -268,12 +272,57 @@ def apply_niche_ranking(results, all_entries):
             dup['Notes'] = f"{dup['Notes']} | {dup_note}" if dup['Notes'] else dup_note
 
 
+def clean_dragged_path(raw):
+    """Dragging a file into a terminal window types its path for you, but
+    the exact text varies by OS/app: Terminal.app backslash-escapes spaces
+    (My\\ File.xlsx), while Windows Command Prompt/PowerShell and some
+    terminals wrap the whole thing in quotes instead ("My File.xlsx").
+    Handle both so either drag-and-drop style, or manual typing, works."""
+    raw = raw.strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ('"', "'"):
+        raw = raw[1:-1]
+    raw = raw.replace('\\ ', ' ')
+    return os.path.expanduser(raw)
+
+
+def prompt_input_path(label):
+    while True:
+        raw = input(f"{label}\n> ").strip()
+        path = clean_dragged_path(raw)
+        if not path:
+            print("Please enter a path (or drag the file into this window).\n")
+            continue
+        if not os.path.isfile(path):
+            print(f"Can't find a file at: {path}\nTry again, or drag the file into this window to auto-fill its path.\n")
+            continue
+        return path
+
+
+def prompt_output_path():
+    raw = input(
+        "Where should the recommendations CSV be saved?\n"
+        "Press Enter to use 'vault-recommendations.csv' in the current folder, "
+        "or drag a destination folder in and add a filename.\n> "
+    ).strip()
+    path = clean_dragged_path(raw)
+    if not path:
+        return 'vault-recommendations.csv'
+    if os.path.isdir(path):
+        path = os.path.join(path, 'vault-recommendations.csv')
+    return path
+
+
 def main():
-    if len(sys.argv) < 3:
-        print(__doc__)
-        sys.exit(1)
-    xlsx_path, csv_path = sys.argv[1], sys.argv[2]
-    out_path = sys.argv[3] if len(sys.argv) > 3 else 'vault-recommendations.csv'
+    if len(sys.argv) >= 3:
+        xlsx_path, csv_path = sys.argv[1], sys.argv[2]
+        out_path = sys.argv[3] if len(sys.argv) > 3 else 'vault-recommendations.csv'
+    else:
+        print("No paths given on the command line -- I'll ask for them one at a time.")
+        print("Tip: drag a file from Finder/Explorer straight into this window to fill in its path.\n")
+        xlsx_path = prompt_input_path("Path to the Endgame Analysis spreadsheet (.xlsx):")
+        csv_path = prompt_input_path("Path to your DIM vault export (.csv):")
+        out_path = prompt_output_path()
+        print()
 
     index = build_weapon_index(xlsx_path)
     all_entries = [e for entries in index.values() for e in entries]
