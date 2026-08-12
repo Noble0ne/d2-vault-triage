@@ -2,6 +2,45 @@
 
 Cross-references a [DIM](https://app.destinyitemmanager.com/) weapon vault CSV export against a Destiny 2 tier-list spreadsheet and recommends **LOCK** (keep) vs **UNLOCK** (safe to dismantle) for every weapon you own.
 
+Run it with no arguments and Ghost walks you through it:
+
+```
+------------------------------------------------------------
+GHOST: Online. Running diagnostics... vault's heavier than
+       last time, Guardian.
+GHOST: Let's sort out what's worth carrying and what's dead
+       weight. I'll need a couple things from you first.
+------------------------------------------------------------
+
+Tip: drag a file straight from Finder/Explorer into this window
+instead of typing the path out -- I'm not picky about how the
+intel reaches me.
+
+GHOST: First -- the Endgame Analysis spreadsheet. Where's it stashed?
+> 
+GHOST: Good. Now your vault export -- the DIM CSV. Same deal.
+> 
+GHOST: Last thing -- where do you want the recommendations written?
+Press Enter and I'll call it 'vault-recommendations.csv', or point me
+somewhere else -- a folder, or a folder plus a filename.
+> 
+
+GHOST: Give me a second... scanning your arsenal.
+
+GHOST: Scan complete, Guardian. Here's the breakdown:
+  Total weapons scanned:              426
+  LOCK (A/S tier):                     201
+  LOCK (exotic -- always kept):        113
+  KEEP (best available in niche):      65
+  UNLOCK (B tier or below):            42
+  UNLOCK (ungraded, no niche gap):     0
+  UNLOCK (not in the analysis at all): 5
+
+GHOST: Full report's in vault-recommendations.csv.
+GHOST: When you're ready, drag vault-recommendations-dim-import.csv into DIM's Import CSV
+       to apply the tags. I'll leave the actual dismantling to you.
+```
+
 Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) (view-only link) — the sheet names and columns this script expects (see Usage below) come from that spreadsheet's layout.
 
 > **⚠️ This script does not delete or dismantle anything.** It only writes CSV notes/tags (`keep`/`junk`) that you import into DIM as suggestions. Nothing happens to your weapons until **you** review the recommendations and manually lock/dismantle them yourself, in-game or in DIM. Always review before acting on it — treat every recommendation as a suggestion, not an instruction.
