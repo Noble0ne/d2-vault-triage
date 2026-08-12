@@ -16,9 +16,15 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 ## What it does
 
 - **S/A tier → LOCK.** B tier and below → UNLOCK.
-- **Exotics are exempt** from tier filtering entirely — every owned exotic locks, regardless of grade.
+- **Exotics are exempt** from tier filtering entirely — every owned exotic locks, regardless of grade. In practice this tool doesn't spend any real judgment on exotics at all: most can be reclaimed from Collections almost any time, so there's no actual risk in leaving that decision alone. The one common exception is exotics with random perk rolls Collections can't reproduce (e.g. Hawkmoon) — if you're chasing a specific roll, track that yourself; this tool won't flag it. **This makes it, in practice, a Legendary-weapon triage tool** — it's making sure you're holding onto genuinely good/meta Legendaries, not making any real call on your exotics.
 - **Niche ranking**: within each (Category, Frame, Element) niche — e.g. Rocket-frame Kinetic Pulse Rifle, or Strand Bow — the best-ranked weapon you own is kept even if its raw tier is mediocre, since it's the only thing covering that niche until something better drops. Any other owned weapon in the same niche is flagged as redundant, with a note pointing at what's already covering it and what the sheet's actual top-ranked option is.
 - Weapons not present in the tier-list sheet at all are UNLOCK by default — no signal, no assumed value.
+
+## About the tier-list data
+
+The lock/unlock calls this script makes are only as good as the tier list behind them — right now, that's Aegis's Endgame Analysis spreadsheet. Aegis is a well-regarded Destiny 2 data scientist, but his tier list is still one analyst's testing and opinion, not an objective source of truth. Treat every recommendation this script produces as a starting point, not a verdict — cross-check against your own experience or another in-depth analysis if something looks off to you.
+
+This script is currently built and tested specifically against Aegis's spreadsheet layout (see the sheet names/columns listed under Usage below). It'll technically run against a differently-structured tier list too (see "Reusing with your own data"), but Aegis's sheet is the one it's aimed at right now.
 
 ## Usage
 
