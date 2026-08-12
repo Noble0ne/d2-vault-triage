@@ -6,7 +6,9 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 
 ## Requirements
 
-- **Python 3.7 or later** — check with `python3 --version`. Get it from [python.org](https://www.python.org/downloads/) if you don't have it, or via `brew install python3` on macOS.
+- **Python 3.7 or later.**
+  - **macOS/Linux**: check with `python3 --version` in Terminal. If missing, get it from [python.org](https://www.python.org/downloads/) or `brew install python3` on macOS.
+  - **Windows**: check with `python --version` in Command Prompt or PowerShell. If missing, download the installer from [python.org](https://www.python.org/downloads/windows/) and, on the first install screen, **check the "Add python.exe to PATH" box** before clicking Install — if you skip this, `python` won't be recognized as a command afterward.
 - **No pip installs needed.** The script only uses Python's standard library (`csv`, `zipfile`, `xml.etree`) — nothing to `pip install`.
 
 ## What it does
@@ -25,15 +27,28 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 
 ### 2. Run it
 
+**macOS/Linux** (Terminal):
 ```bash
 python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
 ```
 
+**Windows** (Command Prompt or PowerShell):
+```
+python d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+```
+
 - `output.csv` is optional — defaults to `vault-recommendations.csv` if you don't pass one.
-- Run from inside the folder where you downloaded both files, or use full paths, e.g.:
+- Run from inside the folder where you downloaded both files and the script, or use full paths. Examples:
   ```bash
+  # macOS/Linux
   python3 d2-vault-triage.py ~/Downloads/Endgame_Analysis.xlsx ~/Downloads/destiny_weapon.csv
   ```
+  ```
+  :: Windows
+  python d2-vault-triage.py C:\Users\YourName\Downloads\Endgame_Analysis.xlsx C:\Users\YourName\Downloads\destiny_weapon.csv
+  ```
+- **Windows only**: if you see `'python' is not recognized as an internal or external command`, Python either isn't installed or wasn't added to PATH during setup — reinstall from python.org and make sure "Add python.exe to PATH" is checked, or run the installer again and choose "Modify" → check that box.
+- To get to the right folder in a terminal: on Windows, open the folder in File Explorer, click the address bar, type `cmd`, and press Enter — it opens Command Prompt already in that folder.
 
 Two files are written:
 
