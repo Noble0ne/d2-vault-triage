@@ -285,24 +285,24 @@ def clean_dragged_path(raw):
     return os.path.expanduser(raw)
 
 
-def prompt_input_path(label):
+def prompt_input_path(question, retry_hint):
     while True:
-        raw = input(f"{label}\n> ").strip()
+        raw = input(f"{question}\n> ").strip()
         path = clean_dragged_path(raw)
         if not path:
-            print("Please enter a path (or drag the file into this window).\n")
+            print(f"GHOST: I need something to work with, Guardian. {retry_hint}\n")
             continue
         if not os.path.isfile(path):
-            print(f"Can't find a file at: {path}\nTry again, or drag the file into this window to auto-fill its path.\n")
+            print(f"GHOST: Nothing at that path that I can see. {retry_hint}\n")
             continue
         return path
 
 
 def prompt_output_path():
     raw = input(
-        "Where should the recommendations CSV be saved?\n"
-        "Press Enter to use 'vault-recommendations.csv' in the current folder, "
-        "or drag a destination folder in and add a filename.\n> "
+        "GHOST: Last thing -- where do you want the recommendations written?\n"
+        "Press Enter and I'll call it 'vault-recommendations.csv', or point me\n"
+        "somewhere else -- a folder, or a folder plus a filename.\n> "
     ).strip()
     path = clean_dragged_path(raw)
     if not path:
@@ -317,12 +317,25 @@ def main():
         xlsx_path, csv_path = sys.argv[1], sys.argv[2]
         out_path = sys.argv[3] if len(sys.argv) > 3 else 'vault-recommendations.csv'
     else:
-        print("No paths given on the command line -- I'll ask for them one at a time.")
-        print("Tip: drag a file from Finder/Explorer straight into this window to fill in its path.\n")
-        xlsx_path = prompt_input_path("Path to the Endgame Analysis spreadsheet (.xlsx):")
-        csv_path = prompt_input_path("Path to your DIM vault export (.csv):")
+        print("-" * 60)
+        print("GHOST: Online. Running diagnostics... vault's heavier than")
+        print("       last time, Guardian.")
+        print("GHOST: Let's sort out what's worth carrying and what's dead")
+        print("       weight. I'll need a couple things from you first.")
+        print("-" * 60)
+        print()
+        print("Tip: drag a file straight from Finder/Explorer into this window")
+        print("instead of typing the path out -- I'm not picky about how the")
+        print("intel reaches me.\n")
+        xlsx_path = prompt_input_path(
+            "GHOST: First -- the Endgame Analysis spreadsheet. Where's it stashed?",
+            "Drag it in, or check the path and try again.")
+        csv_path = prompt_input_path(
+            "GHOST: Good. Now your vault export -- the DIM CSV. Same deal.",
+            "Drag it in, or check the path and try again.")
         out_path = prompt_output_path()
         print()
+        print("GHOST: Give me a second... scanning your arsenal.\n")
 
     index = build_weapon_index(xlsx_path)
     all_entries = [e for entries in index.values() for e in entries]
@@ -382,15 +395,19 @@ def main():
     unlock = sum(1 for r in results if r['Recommendation'] == 'UNLOCK')
     ungraded = sum(1 for r in results if r['Recommendation'] == 'UNLOCK (ungraded)')
     untiered = sum(1 for r in results if r['Recommendation'] == 'UNLOCK (untiered)')
-    print(f"Total rows: {len(results)}")
-    print(f"LOCK (A/S tier):        {lock}")
-    print(f"LOCK (exotic - always kept): {lock_exotic}")
-    print(f"KEEP (best available in niche): {keep_niche}")
-    print(f"UNLOCK (B tier or below): {unlock}")
-    print(f"UNLOCK (ungraded category, no niche gap): {ungraded}")
-    print(f"UNLOCK (not in analysis at all): {untiered}")
-    print(f"Written to: {out_path}")
-    print(f"DIM-importable tag/notes file: {dim_path}")
+    print()
+    print("GHOST: Scan complete, Guardian. Here's the breakdown:")
+    print(f"  Total weapons scanned:              {len(results)}")
+    print(f"  LOCK (A/S tier):                     {lock}")
+    print(f"  LOCK (exotic -- always kept):        {lock_exotic}")
+    print(f"  KEEP (best available in niche):      {keep_niche}")
+    print(f"  UNLOCK (B tier or below):            {unlock}")
+    print(f"  UNLOCK (ungraded, no niche gap):     {ungraded}")
+    print(f"  UNLOCK (not in the analysis at all): {untiered}")
+    print()
+    print(f"GHOST: Full report's in {out_path}.")
+    print(f"GHOST: When you're ready, drag {dim_path} into DIM's Import CSV")
+    print("       to apply the tags. I'll leave the actual dismantling to you.")
 
 
 if __name__ == '__main__':
