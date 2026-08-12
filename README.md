@@ -16,16 +16,22 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 ## What it does
 
 - **S/A tier → LOCK.** B tier and below → UNLOCK.
-- **Exotics are exempt** from tier filtering entirely — every owned exotic locks, regardless of grade.
+- **Exotics are exempt** from tier filtering entirely — every owned exotic locks, regardless of grade. In practice this tool doesn't spend any real judgment on exotics at all: most can be reclaimed from Collections almost any time, so there's no actual risk in leaving that decision alone. The one common exception is exotics with random perk rolls Collections can't reproduce (e.g. Hawkmoon) — if you're chasing a specific roll, track that yourself; this tool won't flag it. **This makes it, in practice, a Legendary-weapon triage tool** — it's making sure you're holding onto genuinely good/meta Legendaries, not making any real call on your exotics.
 - **Niche ranking**: within each (Category, Frame, Element) niche — e.g. Rocket-frame Kinetic Pulse Rifle, or Strand Bow — the best-ranked weapon you own is kept even if its raw tier is mediocre, since it's the only thing covering that niche until something better drops. Any other owned weapon in the same niche is flagged as redundant, with a note pointing at what's already covering it and what the sheet's actual top-ranked option is.
 - Weapons not present in the tier-list sheet at all are UNLOCK by default — no signal, no assumed value.
+
+## About the tier-list data
+
+The lock/unlock calls this script makes are only as good as the tier list behind them — right now, that's Aegis's Endgame Analysis spreadsheet. Aegis is a well-regarded Destiny 2 data scientist, but his tier list is still one analyst's testing and opinion, not an objective source of truth. Treat every recommendation this script produces as a starting point, not a verdict — cross-check against your own experience or another in-depth analysis if something looks off to you.
+
+This script is currently built and tested specifically against Aegis's spreadsheet layout (see the sheet names/columns listed under Usage below). It'll technically run against a differently-structured tier list too (see "Reusing with your own data"), but Aegis's sheet is the one it's aimed at right now.
 
 ## Usage
 
 ### 1. Get the two input files
 
 - **`analysis.xlsx`** — download Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) as an Excel file: File → Download → Microsoft Excel (.xlsx). A different tier-list spreadsheet works too, as long as it has one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons). Each sheet needs at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
-- **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/), go to Settings, and use the CSV export option for weapons.
+- **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/) → **Settings** → **Spreadsheets** section → click **Weapons** to download the CSV.
 
 ### 2. Run it
 
@@ -66,6 +72,12 @@ Two files are written:
 
 1. The full analysis (`output.csv`, or your chosen name) — every weapon with its resolved tier, rank, category, recommendation, and reasoning note.
 2. `<output>-dim-import.csv` — a matching `Id`/`Hash`/`Tag`/`Notes` subset for reimporting tags directly into DIM (DIM's importer only reads those four columns; recommendations map to DIM's `keep`/`junk` tags since DIM has no native lock/unlock tag).
+
+### 3. Bring the recommendations back into DIM
+
+In DIM, go back to **Settings** → **Spreadsheets** → **Weapons**, then drag the `<output>-dim-import.csv` file into the **Import CSV** drop zone. This applies the `keep`/`junk` tags and notes from the analysis to each weapon in your account — same place you got the export from in step 1.
+
+Remember: this only sets tags. Nothing gets locked, unlocked, or dismantled automatically — that's still on you, in DIM or in-game.
 
 ## Reusing with your own data
 
