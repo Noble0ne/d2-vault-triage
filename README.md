@@ -25,7 +25,7 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 ### 1. Get the two input files
 
 - **`analysis.xlsx`** — download Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) as an Excel file: File → Download → Microsoft Excel (.xlsx). A different tier-list spreadsheet works too, as long as it has one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons). Each sheet needs at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
-- **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/), go to Settings, and use the CSV export option for weapons.
+- **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/) → **Settings** → **Spreadsheets** section → click **Weapons** to download the CSV.
 
 ### 2. Run it
 
@@ -66,6 +66,12 @@ Two files are written:
 
 1. The full analysis (`output.csv`, or your chosen name) — every weapon with its resolved tier, rank, category, recommendation, and reasoning note.
 2. `<output>-dim-import.csv` — a matching `Id`/`Hash`/`Tag`/`Notes` subset for reimporting tags directly into DIM (DIM's importer only reads those four columns; recommendations map to DIM's `keep`/`junk` tags since DIM has no native lock/unlock tag).
+
+### 3. Bring the recommendations back into DIM
+
+In DIM, go back to **Settings** → **Spreadsheets** → **Weapons**, then drag the `<output>-dim-import.csv` file into the **Import CSV** drop zone. This applies the `keep`/`junk` tags and notes from the analysis to each weapon in your account — same place you got the export from in step 1.
+
+Remember: this only sets tags. Nothing gets locked, unlocked, or dismantled automatically — that's still on you, in DIM or in-game.
 
 ## Reusing with your own data
 
