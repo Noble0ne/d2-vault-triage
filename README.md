@@ -2,6 +2,13 @@
 
 Cross-references a [DIM](https://app.destinyitemmanager.com/) weapon vault CSV export against a Destiny 2 tier-list spreadsheet and recommends **LOCK** (keep) vs **UNLOCK** (safe to dismantle) for every weapon you own.
 
+Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) (view-only link) — the sheet names and columns this script expects (see Usage below) come from that spreadsheet's layout.
+
+## Requirements
+
+- **Python 3.7 or later** — check with `python3 --version`. Get it from [python.org](https://www.python.org/downloads/) if you don't have it, or via `brew install python3` on macOS.
+- **No pip installs needed.** The script only uses Python's standard library (`csv`, `zipfile`, `xml.etree`) — nothing to `pip install`.
+
 ## What it does
 
 - **S/A tier → LOCK.** B tier and below → UNLOCK.
@@ -11,13 +18,22 @@ Cross-references a [DIM](https://app.destinyitemmanager.com/) weapon vault CSV e
 
 ## Usage
 
+### 1. Get the two input files
+
+- **`analysis.xlsx`** — download Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) as an Excel file: File → Download → Microsoft Excel (.xlsx). A different tier-list spreadsheet works too, as long as it has one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons). Each sheet needs at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
+- **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/), go to Settings, and use the CSV export option for weapons.
+
+### 2. Run it
+
 ```bash
 python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
 ```
 
-- `analysis.xlsx` — a tier-list spreadsheet with one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons). Each sheet needs at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
-- `vault-export.csv` — your DIM weapon export (Settings → Export Inventory in DIM, or the CSV export option in the DIM app).
-- `output.csv` — optional, defaults to `vault-recommendations.csv`.
+- `output.csv` is optional — defaults to `vault-recommendations.csv` if you don't pass one.
+- Run from inside the folder where you downloaded both files, or use full paths, e.g.:
+  ```bash
+  python3 d2-vault-triage.py ~/Downloads/Endgame_Analysis.xlsx ~/Downloads/destiny_weapon.csv
+  ```
 
 Two files are written:
 
