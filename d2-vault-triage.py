@@ -5,11 +5,17 @@ the "Endgame Analysis" spreadsheet tier lists and recommends LOCK (keep)
 vs UNLOCK (safe to dismantle).
 
 Usage:
-    python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+    python3 d2-vault-triage.py <vault-export.csv> [output.csv]
 
-Or run it with no arguments and it will ask for each path interactively --
-drag a file from Finder/Explorer straight into the terminal window to fill
-in its path instead of typing it out.
+The Endgame Analysis spreadsheet is downloaded automatically (it's a public
+Google Sheet) -- you only ever give it your DIM export and, optionally,
+where to write the results. Run it with no arguments and it will ask for
+each path interactively -- drag a file from Finder/Explorer straight into
+the terminal window to fill in its path instead of typing it out.
+
+To use a different or local copy of the analysis spreadsheet instead of the
+auto-downloaded one, pass all three paths explicitly:
+    python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
 
 Threshold: S/A tier -> LOCK. B/C/D/E/F tier -> UNLOCK. Untiered/not in the
 sheet -> UNLOCK (holds no value in the current sandbox). Exotics are exempt
@@ -25,11 +31,24 @@ A niche already covered by an owned exotic skips this entirely.
 
 Reuse for anyone else: point it at their DIM CSV export, keep the same xlsx.
 
+Data/network scope, for anyone checking before they run this: the script
+downloads the current analysis spreadsheet from its public Google Sheets
+export link (view-only, no sign-in, no Destiny account credentials or API
+access of any kind), reads the local DIM .csv you give it, and writes the
+two output .csv files next to it. Nothing else is read, written, or sent
+anywhere. Pass an explicit analysis.xlsx path (see Usage above) to skip the
+download entirely and use a local file instead.
+
 Designed by github.com/Noble0ne, with Claude.
 """
-import sys, csv, re, zipfile, os
+import sys, csv, re, zipfile, os, tempfile, urllib.request
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
+# An .xlsx file is just a zip archive of XML files (the OOXML format) --
+# zipfile + ElementTree (both stdlib) are enough to read it, no openpyxl
+# or other pip install required. NS is the XML namespace every spreadsheet
+# tag in those files lives under; ElementTree needs it to match tags.
 NS = {'m': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 
 WEAPON_SHEET_NAMES = {
@@ -38,8 +57,55 @@ WEAPON_SHEET_NAMES = {
     'HGLs', 'LFRs', 'LMGs', 'Rockets', 'Swords', 'Other', 'Exotic Weapons',
 }
 
+TIER_LIST_URL = (
+    'https://docs.google.com/spreadsheets/d/'
+    '1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/export?format=xlsx'
+)
+
+
+def download_tier_list(dest_path=None):
+    """Downloads Aegis's current Endgame Analysis workbook straight from its
+    public Google Sheets export link -- no manual File -> Download step
+    needed. Writes to a temp file first and only replaces the real
+    destination once the download is confirmed to be an actual .xlsx (a
+    real zip archive) -- Google serves an HTML sign-in/quota page instead of
+    the file if the sheet ever becomes unreachable, and this catches that
+    case rather than silently handing garbage to build_weapon_index().
+    Returns the path to the downloaded file as a string. Raises on any
+    failure (network error, bad response) -- callers decide how to surface
+    that: the CLI falls back to asking for a local file, the GUI shows it
+    in the tier-list status label."""
+    if dest_path is None:
+        folder = Path(tempfile.gettempdir()) / 'd2-vault-triage'
+        folder.mkdir(parents=True, exist_ok=True)
+        dest_path = folder / 'aegis-endgame-analysis.xlsx'
+    dest_path = Path(dest_path)
+    tmp_path = dest_path.with_suffix('.tmp')
+
+    request = urllib.request.Request(TIER_LIST_URL, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        tmp_path.write_bytes(response.read())
+
+    if not zipfile.is_zipfile(tmp_path):
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        raise ValueError(
+            "Download did not return a valid .xlsx workbook -- Google may "
+            "have served an error or sign-in page instead of the file.")
+
+    os.replace(tmp_path, dest_path)
+    return str(dest_path)
+
 
 def load_shared_strings(z):
+    """OOXML doesn't store repeated text inline in each cell -- every unique
+    string in the whole workbook lives once in xl/sharedStrings.xml, and
+    individual cells just reference it by index. This reads that table into
+    a plain list, so a cell's stored index (0, 1, 2, ...) becomes a lookup:
+    shared[index] -> the actual text. Without this, string cells would come
+    back as bare numbers instead of weapon names."""
     root = ET.fromstring(z.read('xl/sharedStrings.xml'))
     shared = []
     for si in root.findall('m:si', NS):
@@ -49,6 +115,14 @@ def load_shared_strings(z):
 
 
 def sheet_name_to_file(z):
+    """The tab name you see in Excel/Sheets (e.g. "Autos") isn't the name of
+    the file that holds its data -- internally it's just "sheet7.xml" or
+    similar. Getting from one to the other takes two files: workbook.xml
+    lists each visible tab name next to a relationship id (rId3, rId7, ...),
+    and workbook.xml.rels maps those same relationship ids to the actual
+    worksheet filename. This stitches both together into one direct lookup:
+    tab name -> worksheet file -- so the rest of the script can ask for
+    "Autos" by name instead of guessing which sheetN.xml it landed in."""
     wb = z.read('xl/workbook.xml').decode('utf-8')
     rels = z.read('xl/_rels/workbook.xml.rels').decode('utf-8')
     relmap = dict(re.findall(
@@ -58,6 +132,14 @@ def sheet_name_to_file(z):
 
 
 def read_sheet(z, sheetfile, shared):
+    """Parses one worksheet's raw XML into a plain list of row dicts, one
+    per spreadsheet row, keyed by column letter (A, B, C, ...) -- the same
+    layout you'd see looking at the sheet in a spreadsheet app. Each cell
+    tag (<c>) carries its own column letter in its "r" attribute (e.g.
+    r="C4" -> column C); a cell tagged t="s" holds a shared-string index
+    rather than literal text, so those get resolved through the `shared`
+    lookup from load_shared_strings() before being stored. Cells with no
+    value (empty in the spreadsheet) come back as None."""
     root = ET.fromstring(z.read(f'xl/worksheets/{sheetfile}'))
     sheetdata = root.find('m:sheetData', NS)
     rows = []
@@ -76,8 +158,14 @@ def read_sheet(z, sheetfile, shared):
 
 
 def build_weapon_index(xlsx_path):
-    """name -> list of {name, category, energy, frame, notes, rank, tier}"""
-    z = zipfile.ZipFile(xlsx_path)
+    """name -> list of {name, category, energy, frame, notes, rank, tier}
+
+    Reads the whole analysis spreadsheet once and turns it into an in-memory
+    lookup keyed by weapon name, so the main loop can look up each owned
+    weapon by name instead of re-scanning the sheet per weapon. Only sheets
+    in WEAPON_SHEET_NAMES are read -- any other tab in the workbook (notes,
+    changelog, whatever else the analysis includes) is skipped entirely."""
+    z = zipfile.ZipFile(xlsx_path)  # .xlsx is a zip; open it as one directly
     shared = load_shared_strings(z)
     name_to_file = sheet_name_to_file(z)
     index = {}
@@ -87,6 +175,11 @@ def build_weapon_index(xlsx_path):
         rows = read_sheet(z, sheetfile, shared)
         if len(rows) < 2:
             continue
+        # Row 0 is a title row (e.g. "Auto Rifles"), row 1 is the real
+        # column header. colmap flips {column letter: header text} around
+        # to {header text: column letter}, so the rest of this function can
+        # ask for colmap.get('Tier') instead of hardcoding a column letter --
+        # spreadsheet columns get inserted/reordered; header names don't.
         header = rows[1]
         colmap = {v: k for k, v in header.items() if v}
         name_col = colmap.get('Name')
@@ -315,9 +408,21 @@ def prompt_output_path():
 
 
 def main():
-    if len(sys.argv) >= 3:
-        xlsx_path, csv_path = sys.argv[1], sys.argv[2]
-        out_path = sys.argv[3] if len(sys.argv) > 3 else 'vault-recommendations.csv'
+    if len(sys.argv) == 4:
+        # Explicit override: analysis.xlsx, vault-export.csv, output.csv --
+        # skips the download entirely in favor of a specific local file.
+        xlsx_path, csv_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+    elif len(sys.argv) in (2, 3):
+        csv_path = sys.argv[1]
+        out_path = sys.argv[2] if len(sys.argv) > 2 else 'vault-recommendations.csv'
+        print("GHOST: Pulling the current Endgame Analysis before we start...")
+        try:
+            xlsx_path = download_tier_list()
+        except Exception as exc:
+            sys.exit(
+                f"GHOST: Couldn't reach the Endgame Analysis spreadsheet: {exc}\n"
+                f"GHOST: Pass a local copy explicitly instead: python3 "
+                f"d2-vault-triage.py <analysis.xlsx> {csv_path} {out_path}")
     else:
         print("-" * 60)
         print("GHOST: Online. Running diagnostics... vault's heavier than")
@@ -329,9 +434,15 @@ def main():
         print("Tip: drag a file straight from Finder/Explorer into this window")
         print("instead of typing the path out -- I'm not picky about how the")
         print("intel reaches me.\n")
-        xlsx_path = prompt_input_path(
-            "GHOST: First -- the Endgame Analysis spreadsheet. Where's it stashed?",
-            "Drag it in, or check the path and try again.")
+        print("GHOST: First, let me pull the current Endgame Analysis spreadsheet.")
+        try:
+            xlsx_path = download_tier_list()
+            print("GHOST: Got it -- current sandbox data in hand.\n")
+        except Exception as exc:
+            print(f"GHOST: Uplink dropped out, couldn't download it: {exc}\n")
+            xlsx_path = prompt_input_path(
+                "GHOST: Point me at a local copy of the analysis spreadsheet instead.",
+                "Drag it in, or check the path and try again.")
         csv_path = prompt_input_path(
             "GHOST: Good. Now your vault export -- the DIM CSV. Same deal.",
             "Drag it in, or check the path and try again.")
