@@ -244,20 +244,27 @@ def _rank_val(v):
         return 999
 
 
-def recommend(tier, category):
-    """S/A tier -> LOCK. B/C/D/E/F tier -> UNLOCK. Exotics are exempt from
-    tier filtering entirely -- keep all of them regardless of grade.
-    Two different kinds of "no tier" exist and are NOT treated the same:
-    a weapon that resolved against the sheet but whose category (LMGs,
-    Other) has no Tier/Rank column at all is UNLOCK (ungraded) -- present,
-    just not scored, so niche-uniqueness can still save it. A weapon that
-    isn't in the sheet by name at all is UNLOCK (untiered) -- no signal
-    whatsoever, no value assumed."""
+TIER_ORDER = ('S', 'A', 'B', 'C', 'D', 'E', 'F')
+# best-to-worst, matching Aegis's own lettering -- index() on this tuple is how
+# recommend() below compares a weapon's tier against the chosen keep-threshold
+# without hardcoding which specific letters count as "good enough to keep".
+
+
+def recommend(tier, category, min_tier='A'):
+    """Tiers at or above min_tier -> LOCK ('A' keeps S+A, the default;
+    'S' keeps S only). Everything below min_tier -> UNLOCK. Exotics are
+    exempt from tier filtering entirely -- keep all of them regardless
+    of grade. Two different kinds of "no tier" exist and are NOT treated
+    the same: a weapon that resolved against the sheet but whose category
+    (LMGs, Other) has no Tier/Rank column at all is UNLOCK (ungraded) --
+    present, just not scored, so niche-uniqueness can still save it. A
+    weapon that isn't in the sheet by name at all is UNLOCK (untiered) --
+    no signal whatsoever, no value assumed."""
     if category == 'Exotic Weapons':
         return 'LOCK (exotic)'
-    if tier in ('S', 'A'):
-        return 'LOCK'
-    if tier in ('B', 'C', 'D', 'E', 'F'):
+    if tier in TIER_ORDER:
+        if TIER_ORDER.index(tier) <= TIER_ORDER.index(min_tier):
+            return 'LOCK'
         return 'UNLOCK'
     if category:
         return 'UNLOCK (ungraded)'
@@ -272,7 +279,7 @@ def dim_tag(recommendation):
     return 'junk'
 
 
-def build_note(rec, tier, rank, category, sheet_notes):
+def build_note(rec, tier, rank, category, sheet_notes, min_tier='A'):
     """Baseline note explaining the call before any niche-ranking context
     gets appended. For junk calls this spells out the actual grade and the
     sheet's own critique, rather than just a bare tier letter, so the reason
@@ -284,8 +291,8 @@ def build_note(rec, tier, rank, category, sheet_notes):
     elif rec == 'LOCK':
         base = f"{tier} tier (Rank {rank} in {category})."
     elif rec == 'UNLOCK' and tier:
-        base = (f"{tier} tier (Rank {rank} in {category}) -- graded below A, "
-                f"not worth a vault slot at this grade.")
+        base = (f"{tier} tier (Rank {rank} in {category}) -- graded below "
+                f"{min_tier}, not worth a vault slot at this grade.")
     elif rec == 'UNLOCK (ungraded)':
         base = (f"Present in the analysis under {category}, but that category "
                  "has no Tier/Rank data to grade it against.")
@@ -407,14 +414,29 @@ def prompt_output_path():
     return path
 
 
+def prompt_min_tier():
+    raw = input(
+        "GHOST: Keep threshold -- lock A-tier and up (default), or S-tier\n"
+        "only? Press Enter for A-tier and up, or type S.\n> "
+    ).strip().upper()
+    return 'S' if raw == 'S' else 'A'
+
+
 def main():
-    if len(sys.argv) == 4:
+    args = sys.argv[1:]
+    # --s-only is stripped out of args before any of the length checks below run,
+    # so it composes with all three existing invocation forms (0/2-3/4 positional
+    # args) instead of needing its own separate argument-count branch.
+    min_tier = 'S' if '--s-only' in args else 'A'
+    args = [a for a in args if a != '--s-only']
+
+    if len(args) == 4:
         # Explicit override: analysis.xlsx, vault-export.csv, output.csv --
         # skips the download entirely in favor of a specific local file.
-        xlsx_path, csv_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
-    elif len(sys.argv) in (2, 3):
-        csv_path = sys.argv[1]
-        out_path = sys.argv[2] if len(sys.argv) > 2 else 'vault-recommendations.csv'
+        xlsx_path, csv_path, out_path = args[0], args[1], args[2]
+    elif len(args) in (2, 3):
+        csv_path = args[0]
+        out_path = args[1] if len(args) > 1 else 'vault-recommendations.csv'
         print("GHOST: Pulling the current Endgame Analysis before we start...")
         try:
             xlsx_path = download_tier_list()
@@ -447,6 +469,7 @@ def main():
             "GHOST: Good. Now your vault export -- the DIM CSV. Same deal.",
             "Drag it in, or check the path and try again.")
         out_path = prompt_output_path()
+        min_tier = prompt_min_tier()
         print()
         print("GHOST: Give me a second... scanning your arsenal.\n")
 
@@ -463,17 +486,17 @@ def main():
         category_hint = 'Exotic Weapons' if row.get('Rarity') == 'Exotic' else None
         if resolved:
             entry = pick_entry(index[resolved], row)
-            rec = recommend(entry['tier'], entry['category'])
+            rec = recommend(entry['tier'], entry['category'], min_tier)
         else:
             entry = {'category': category_hint, 'energy': None, 'frame': None,
                       'tier': None, 'rank': None, 'notes': None}
-            rec = recommend(None, category_hint)
+            rec = recommend(None, category_hint, min_tier)
         results.append({
             'Name': name,
             'Hash': row.get('Hash'),
             'Id': row.get('Id'),
             'Tag': dim_tag(rec),
-            'Notes': build_note(rec, entry['tier'], entry['rank'], entry['category'], entry['notes']),
+            'Notes': build_note(rec, entry['tier'], entry['rank'], entry['category'], entry['notes'], min_tier),
             'Type': row.get('Type'),
             'Element': row.get('Element'),
             'Frame': entry['frame'],

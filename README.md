@@ -46,12 +46,15 @@ Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://doc
 
 > **⚠️ This script does not delete or dismantle anything.** It only writes CSV notes/tags (`keep`/`junk`) that you import into DIM as suggestions. Nothing happens to your weapons until **you** review the recommendations and manually lock/dismantle them yourself, in-game or in DIM. Always review before acting on it — treat every recommendation as a suggestion, not an instruction.
 
+> **🔍 This is open source — read it before you run it.** Every line of both scripts is in this repo, and both are commented in more detail than a typical project specifically so someone with no context can audit what they're about to run, not just what a function is called. If you'd rather not run a prebuilt `.app`/`.exe`, the safest path is to run `d2-vault-triage.py`/`d2-vault-triage-gui.py` directly from source with `python3` — that way there's no build step between what you read and what actually executes. The only network access either script makes is downloading Aegis's tier-list spreadsheet (see the link above) — nothing else is contacted, and no vault/account data ever leaves your machine.
+
 ## Requirements
 
 - **Python 3.7 or later.**
   - **macOS/Linux**: check with `python3 --version` in Terminal. If missing, get it from [python.org](https://www.python.org/downloads/) or `brew install python3` on macOS.
   - **Windows**: check with `python --version` in Command Prompt or PowerShell. If missing, download the installer from [python.org](https://www.python.org/downloads/windows/) and, on the first install screen, **check the "Add python.exe to PATH" box** before clicking Install — if you skip this, `python` won't be recognized as a command afterward.
-- **No pip installs needed.** The script only uses Python's standard library (`csv`, `zipfile`, `xml.etree`, `urllib.request`, `pathlib`, `tempfile`) — nothing to `pip install`.
+- **No pip installs needed for the CLI.** `d2-vault-triage.py` only uses Python's standard library (`csv`, `zipfile`, `xml.etree`, `urllib.request`, `pathlib`, `tempfile`) — nothing to `pip install`.
+- **The GUI (`d2-vault-triage-gui.py`) needs Pillow** (`pip install Pillow`) for the console's live-scaling background image. Tkinter itself ships with Python already — no separate install for that.
 
 ## What it does
 
@@ -105,6 +108,14 @@ python d2-vault-triage.py <vault-export.csv> [output.csv]
 ```
 
 `output.csv` is optional in both modes — defaults to `vault-recommendations.csv` if left blank/omitted. This form always downloads the current Endgame Analysis spreadsheet, same as running with no arguments.
+
+**Keep threshold**: by default, the script locks A-tier and S-tier (exotics are always kept regardless of tier). If you only want to keep S-tier legendaries, add `--s-only` to any of the command-line forms above:
+
+```bash
+python3 d2-vault-triage.py <vault-export.csv> [output.csv] --s-only
+```
+
+Running with no arguments at all asks interactively instead — press Enter for A-tier and up, or type `S`. The GUI has the same choice as a pair of radio buttons ("A-tier and up (default)" / "S-tier only").
 
 - **Windows only**: if you see `'python' is not recognized as an internal or external command`, Python either isn't installed or wasn't added to PATH during setup — reinstall from python.org and make sure "Add python.exe to PATH" is checked, or run the installer again and choose "Modify" → check that box.
 - To get to the right folder in a terminal: on Windows, open the folder in File Explorer, click the address bar, type `cmd`, and press Enter — it opens Command Prompt already in that folder.
