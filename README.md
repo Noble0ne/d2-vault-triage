@@ -16,8 +16,9 @@ Tip: drag a file straight from Finder/Explorer into this window
 instead of typing the path out -- I'm not picky about how the
 intel reaches me.
 
-GHOST: First -- the Endgame Analysis spreadsheet. Where's it stashed?
-> 
+GHOST: First, let me pull the current Endgame Analysis spreadsheet.
+GHOST: Got it -- current sandbox data in hand.
+
 GHOST: Good. Now your vault export -- the DIM CSV. Same deal.
 > 
 GHOST: Last thing -- where do you want the recommendations written?
@@ -41,16 +42,19 @@ GHOST: When you're ready, drag vault-recommendations-dim-import.csv into DIM's I
        to apply the tags. I'll leave the actual dismantling to you.
 ```
 
-Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) (view-only link) — the sheet names and columns this script expects (see Usage below) come from that spreadsheet's layout.
+Built against and tested with Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) (view-only link) — the sheet names and columns this script expects (see Usage below) come from that spreadsheet's layout. The script downloads its current contents automatically; you never have to open the sheet yourself unless you want to look at it.
 
 > **⚠️ This script does not delete or dismantle anything.** It only writes CSV notes/tags (`keep`/`junk`) that you import into DIM as suggestions. Nothing happens to your weapons until **you** review the recommendations and manually lock/dismantle them yourself, in-game or in DIM. Always review before acting on it — treat every recommendation as a suggestion, not an instruction.
+
+> **🔍 This is open source — read it before you run it.** Every line of both scripts is in this repo, and both are commented in more detail than a typical project specifically so someone with no context can audit what they're about to run, not just what a function is called. If you'd rather not run a prebuilt `.app`/`.exe`, the safest path is to run `d2-vault-triage.py`/`d2-vault-triage-gui.py` directly from source with `python3` — that way there's no build step between what you read and what actually executes. The only network access either script makes is downloading Aegis's tier-list spreadsheet (see the link above) — nothing else is contacted, and no vault/account data ever leaves your machine.
 
 ## Requirements
 
 - **Python 3.7 or later.**
   - **macOS/Linux**: check with `python3 --version` in Terminal. If missing, get it from [python.org](https://www.python.org/downloads/) or `brew install python3` on macOS.
   - **Windows**: check with `python --version` in Command Prompt or PowerShell. If missing, download the installer from [python.org](https://www.python.org/downloads/windows/) and, on the first install screen, **check the "Add python.exe to PATH" box** before clicking Install — if you skip this, `python` won't be recognized as a command afterward.
-- **No pip installs needed.** The script only uses Python's standard library (`csv`, `zipfile`, `xml.etree`) — nothing to `pip install`.
+- **No pip installs needed for the CLI.** `d2-vault-triage.py` only uses Python's standard library (`csv`, `zipfile`, `xml.etree`, `urllib.request`, `pathlib`, `tempfile`) — nothing to `pip install`.
+- **The GUI (`d2-vault-triage-gui.py`) needs Pillow** (`pip install Pillow`) for the console's live-scaling background image. Tkinter itself ships with Python already — no separate install for that.
 
 ## What it does
 
@@ -67,14 +71,15 @@ This script is currently built and tested specifically against Aegis's spreadshe
 
 ## Usage
 
-### 1. Get the two input files
+### 1. Get your DIM export
 
-- **`analysis.xlsx`** — download Aegis's [Endgame Analysis spreadsheet](https://docs.google.com/spreadsheets/d/1JM-0SlxVDAi-C6rGVlLxa-J1WGewEeL8Qvq4htWZHhY/edit?usp=drive_link) as an Excel file: File → Download → Microsoft Excel (.xlsx). A different tier-list spreadsheet works too, as long as it has one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons). Each sheet needs at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
 - **`vault-export.csv`** — your DIM weapon export: open [DIM](https://app.destinyitemmanager.com/) → **Settings** → **Spreadsheets** section → click **Weapons** to download the CSV.
+
+That's the only file you need to get yourself — the script downloads the current Endgame Analysis spreadsheet automatically. If you'd rather use a specific/local copy instead (e.g. a different tier-list spreadsheet, or the download isn't reachable), see "Reusing with your own data" below — it needs one sheet per weapon category (Autos, Bows, HCs, Pulses, Scouts, Sidearms, SMGs, BGLs, Fusions, Glaives, Shotguns, Snipers, Rocket Sidearms, Traces, HGLs, LFRs, LMGs, Rockets, Swords, Other, Exotic Weapons), each with at minimum a `Name` column; `Energy`, `Frame`, `Notes`, `Tier`, and `Rank` (or `#`) columns are used when present.
 
 ### 2. Run it
 
-The easiest way — just run the script with no extra typing, and it'll ask you for each path one at a time. You can **drag the file straight from Finder/Explorer into the terminal window** when it asks, instead of typing the path out — the window fills in the full path for you.
+The easiest way — just run the script with no extra typing, and it'll ask you for what it needs. You can **drag the file straight from Finder/Explorer into the terminal window** when it asks, instead of typing the path out — the window fills in the full path for you.
 
 **macOS/Linux** (Terminal):
 ```bash
@@ -86,23 +91,31 @@ python3 d2-vault-triage.py
 python d2-vault-triage.py
 ```
 
-It'll ask, in order:
-1. Path to the Endgame Analysis spreadsheet (.xlsx) — drag the file in, or type/paste the path.
-2. Path to your DIM vault export (.csv) — same.
-3. Where to save the recommendations CSV — press Enter to just use `vault-recommendations.csv` in the current folder, or drag a folder in and type a filename after it.
+It'll:
+1. Download the current Endgame Analysis spreadsheet automatically — no prompt, no action needed. If the download fails (no internet, the sheet moved, etc.), it'll ask you to point it at a local `.xlsx` copy instead.
+2. Ask for the path to your DIM vault export (.csv) — drag the file in, or type/paste the path.
+3. Ask where to save the recommendations CSV — press Enter to just use `vault-recommendations.csv` in the current folder, or drag a folder in and type a filename after it.
 
-If you'd rather skip the prompts (e.g. scripting it, or running it the same way repeatedly), pass all the paths directly on the command line instead:
+If you'd rather skip the prompts (e.g. scripting it, or running it the same way repeatedly), pass the paths directly on the command line instead:
 
 ```bash
 # macOS/Linux
-python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+python3 d2-vault-triage.py <vault-export.csv> [output.csv]
 ```
 ```
 :: Windows
-python d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+python d2-vault-triage.py <vault-export.csv> [output.csv]
 ```
 
-`output.csv` is optional in both modes — defaults to `vault-recommendations.csv` if left blank/omitted.
+`output.csv` is optional in both modes — defaults to `vault-recommendations.csv` if left blank/omitted. This form always downloads the current Endgame Analysis spreadsheet, same as running with no arguments.
+
+**Keep threshold**: by default, the script locks A-tier and S-tier (exotics are always kept regardless of tier). If you only want to keep S-tier legendaries, add `--s-only` to any of the command-line forms above:
+
+```bash
+python3 d2-vault-triage.py <vault-export.csv> [output.csv] --s-only
+```
+
+Running with no arguments at all asks interactively instead — press Enter for A-tier and up, or type `S`. The GUI has the same choice as a pair of radio buttons ("A-tier and up (default)" / "S-tier only").
 
 - **Windows only**: if you see `'python' is not recognized as an internal or external command`, Python either isn't installed or wasn't added to PATH during setup — reinstall from python.org and make sure "Add python.exe to PATH" is checked, or run the installer again and choose "Modify" → check that box.
 - To get to the right folder in a terminal: on Windows, open the folder in File Explorer, click the address bar, type `cmd`, and press Enter — it opens Command Prompt already in that folder.
@@ -120,7 +133,20 @@ Remember: this only sets tags. Nothing gets locked, unlocked, or dismantled auto
 
 ## Reusing with your own data
 
-The script is generic — point it at your own DIM CSV export and keep whatever tier-list spreadsheet you're using, as long as the sheet names and columns above line up. No Destiny account credentials or API access involved; it only reads local files.
+The script is generic — point it at your own DIM CSV export and keep whatever tier-list spreadsheet you're using, as long as the sheet names and columns above line up. No Destiny account credentials or API access involved; it only reads local files (plus the one automatic download of the Endgame Analysis spreadsheet, unless you override it).
+
+To use a specific or local analysis spreadsheet instead of the auto-downloaded one, pass all three paths explicitly:
+
+```bash
+# macOS/Linux
+python3 d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+```
+```
+:: Windows
+python d2-vault-triage.py <analysis.xlsx> <vault-export.csv> [output.csv]
+```
+
+This skips the download entirely and uses exactly the file you point it at.
 
 ## License
 
