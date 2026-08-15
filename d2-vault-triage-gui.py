@@ -129,6 +129,9 @@ def load_core():
         "dim_tag",
         "build_note",
         "apply_niche_ranking",
+        "triage_vault",
+        "write_dim_import_csv",
+        "summarize_results",
     )
     missing = [name for name in required if not callable(getattr(module, name, None))]
     if missing:
@@ -144,74 +147,15 @@ CORE = load_core()
 
 def run_triage(xlsx_path, csv_path, out_path, min_tier="A"):
     """
-    Orchestrate the same CSV pipeline as the CLI while delegating every weapon
-    decision to the existing functions in d2-vault-triage.py.
-
-    min_tier mirrors the CLI's --s-only flag/prompt: 'A' (default) locks
-    A-tier and S-tier, 'S' locks S-tier only. It's just forwarded into
-    CORE.recommend()/CORE.build_note() -- the actual tier comparison logic
-    lives in d2-vault-triage.py's TIER_ORDER, not here.
+    Thin GUI wrapper around CORE.triage_vault() -- all the actual weapon-
+    decision logic (resolving names, grading tiers, niche ranking, deciding
+    what's safe to include in the DIM-import file) lives once in
+    d2-vault-triage.py and is shared with the CLI's main(), rather than
+    being duplicated here. This function's only job is turning that shared
+    result into the two output files and a summary the GUI can display.
     """
-    index = CORE.build_weapon_index(xlsx_path)
-    all_entries = [entry for entries in index.values() for entry in entries]
-
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        vault_rows = list(csv.DictReader(f))
-
-    results = []
-
-    for row in vault_rows:
-        name = row["Name"]
-        resolved = CORE.resolve_name(name, index)
-        category_hint = "Exotic Weapons" if row.get("Rarity") == "Exotic" else None
-
-        if resolved:
-            entry = CORE.pick_entry(index[resolved], row)
-            rec = CORE.recommend(entry["tier"], entry["category"], min_tier)
-        else:
-            entry = {
-                "category": category_hint,
-                "energy": None,
-                "frame": None,
-                "tier": None,
-                "rank": None,
-                "notes": None,
-            }
-            rec = CORE.recommend(None, category_hint, min_tier)
-
-        results.append(
-            {
-                "Name": name,
-                "Hash": row.get("Hash"),
-                "Id": row.get("Id"),
-                "Tag": CORE.dim_tag(rec),
-                "Notes": CORE.build_note(
-                    rec,
-                    entry["tier"],
-                    entry["rank"],
-                    entry["category"],
-                    entry["notes"],
-                    min_tier,
-                ),
-                "Type": row.get("Type"),
-                "Element": row.get("Element"),
-                "Frame": entry["frame"],
-                "Category": entry["category"],
-                "Tier": entry["tier"],
-                "Rank": entry["rank"],
-                "Recommendation": rec,
-                "Crafted": row.get("Crafted"),
-                "MasterworkTier": row.get("Masterwork Tier"),
-                "Equipped": row.get("Equipped"),
-            }
-        )
-
-    CORE.apply_niche_ranking(results, all_entries)
-
-    if not results:
-        raise ValueError("The DIM CSV contains no weapon rows.")
-
     out_path = str(out_path)
+    results = CORE.triage_vault(xlsx_path, csv_path, min_tier)
 
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(results[0].keys()))
@@ -219,37 +163,9 @@ def run_triage(xlsx_path, csv_path, out_path, min_tier="A"):
         writer.writerows(results)
 
     dim_path = out_path.rsplit(".", 1)[0] + "-dim-import.csv"
-    with open(dim_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["Id", "Hash", "Tag", "Notes"])
-        writer.writeheader()
-        for row in results:
-            writer.writerow(
-                {
-                    "Id": row["Id"],
-                    "Hash": row["Hash"],
-                    "Tag": row["Tag"],
-                    "Notes": row["Notes"],
-                }
-            )
+    CORE.write_dim_import_csv(results, dim_path)
 
-    summary = {
-        "total": len(results),
-        "lock": sum(1 for r in results if r["Recommendation"] == "LOCK"),
-        "lock_exotic": sum(
-            1 for r in results if r["Recommendation"] == "LOCK (exotic)"
-        ),
-        "keep_niche": sum(
-            1 for r in results if r["Recommendation"] == "KEEP (best available)"
-        ),
-        "unlock": sum(1 for r in results if r["Recommendation"] == "UNLOCK"),
-        "ungraded": sum(
-            1 for r in results if r["Recommendation"] == "UNLOCK (ungraded)"
-        ),
-        "untiered": sum(
-            1 for r in results if r["Recommendation"] == "UNLOCK (untiered)"
-        ),
-    }
-
+    summary = CORE.summarize_results(results)
     return dim_path, summary
 
 
@@ -672,19 +588,30 @@ class VaultTriageGUI:
             return
 
         lock_label = "S tier" if min_tier == "S" else "A/S tier"
-        unlock_label = "A tier or below" if min_tier == "S" else "B tier or below"
+        unlock_label = "below S" if min_tier == "S" else "below A"
 
         lines = [
             "",
             "GHOST: Scan complete, Guardian. Here's the breakdown:",
-            f"  Total weapons scanned:              {summary['total']}",
-            f"  LOCK ({lock_label}):                     {summary['lock']}",
-            f"  LOCK (exotic -- always kept):        {summary['lock_exotic']}",
-            f"  KEEP (best available in niche):      {summary['keep_niche']}",
-            f"  UNLOCK ({unlock_label}):            {summary['unlock']}",
-            f"  UNLOCK (ungraded, no niche gap):     {summary['ungraded']}",
-            f"  UNLOCK (not in the analysis at all): {summary['untiered']}",
+            f"  Total weapons scanned:                    {summary['total']}",
+            f"  LOCK ({lock_label}):                           {summary['lock']}",
+            f"  LOCK (exotic -- always kept):              {summary['lock_exotic']}",
+            f"  KEEP (best available in niche):            {summary['keep_niche']}",
+            f"  UNLOCK (graded {unlock_label}):                    {summary['unlock']}",
+            f"  REVIEW (ungraded category):                {summary['review_ungraded']}",
+            f"  REVIEW (ambiguous match):                  {summary['review_ambiguous']}",
+            f"  REVIEW (duplicate copies, can't tell apart): {summary['review_duplicate']}",
+            f"  UNKNOWN (not in the analysis at all):      {summary['unknown']}",
+        ]
+        if summary["dim_import_skipped"]:
+            lines.append(
+                f"  Skipped from dim-import (already tagged/noted in DIM): "
+                f"{summary['dim_import_skipped']}"
+            )
+        lines += [
             "",
+            "GHOST: REVIEW/UNKNOWN items get no tag at all -- not enough evidence",
+            "       either way, so nothing gets touched in DIM for them.",
             f"GHOST: Full report's in {out_path}.",
             f"GHOST: When you're ready, drag {dim_path} into DIM's Import CSV",
             "       to apply the tags. I'll leave the actual dismantling to you.",
